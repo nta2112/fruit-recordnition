@@ -54,7 +54,31 @@ def predict(model, labels, img_arr, top_k=5):
     preds = np.squeeze(preds)
     # get top k indices
     top_idx = preds.argsort()[-top_k:][::-1]
-    return [(labels[int(i)], float(preds[int(i)])) for i in top_idx]
+    # determine number of classes from prediction vector
+    try:
+        n_classes = preds.shape[-1]
+    except Exception:
+        n_classes = len(preds)
+
+    results = []
+    for i in top_idx:
+        idx = int(i)
+        prob = float(preds[idx])
+        # resolve label name safely
+        label_name = None
+        if isinstance(labels, (list, tuple)):
+            if 0 <= idx < len(labels):
+                label_name = labels[idx]
+        elif isinstance(labels, dict):
+            # try numeric key or string key
+            label_name = labels.get(str(idx), labels.get(idx, None))
+
+        if label_name is None:
+            label_name = f"class_{idx}"
+
+        results.append((label_name, prob))
+
+    return results
 
 
 def main():
@@ -74,7 +98,8 @@ def main():
     uploaded_file = st.file_uploader("Choose an image...", type=["png", "jpg", "jpeg"])
     if uploaded_file is not None:
         image = Image.open(uploaded_file)
-        st.image(image, caption="Uploaded image", use_column_width=True)
+        # use_container_width replaces deprecated use_column_width
+        st.image(image, caption="Uploaded image", use_container_width=True)
 
         img_arr = preprocess_image(image, target_size=(100, 100))
 
@@ -89,58 +114,14 @@ def main():
                     return
 
             st.subheader("Predictions")
+            # If labels length doesn't match model output, fall back to generic names
             for label, prob in results:
-                st.write(f"{label}: {prob:.4f}")
+                try:
+                    st.write(f"{label}: {prob:.4f}")
+                except Exception:
+                    # fallback: label might be invalid / index out of range
+                    st.write(f"class (index unknown): {prob:.4f}")
 
 
 if __name__ == "__main__":
     main()
-import streamlit as st
-import tensorflow as tf
-from tensorflow.keras.preprocessing import image
-import numpy as np
-from PIL import Image
-
-# --- Cấu hình trang ---
-st.set_page_config(page_title="Nhận dạng hoa quả", page_icon="🍎", layout="centered")
-
-# --- Tiêu đề ---
-st.title("🍇 Ứng dụng nhận dạng hoa quả bằng CNN")
-st.write("Tải lên ảnh hoa quả để mô hình dự đoán loại của nó.")
-
-# --- Tải mô hình ---
-@st.cache_resource
-def load_model():
-    model = tf.keras.models.load_model("fruit_cnn_best.h5")
-    return model
-
-model = load_model()
-
-# --- Danh sách nhãn ---
-# ⚠️ Bạn cần thay đổi danh sách này cho đúng với tập huấn luyện của bạn
-class_names = ['apple', 'banana', 'orange', 'mango', 'pineapple', 'grape']
-
-# --- Upload ảnh ---
-uploaded_file = st.file_uploader("Tải ảnh hoa quả lên", type=["jpg", "jpeg", "png"])
-
-if uploaded_file is not None:
-    # Hiển thị ảnh
-    img = Image.open(uploaded_file).convert('RGB')
-    st.image(img, caption='Ảnh đã tải lên', use_column_width=True)
-
-    # Tiền xử lý ảnh
-    img = img.resize((100, 100))  # kích thước theo input_shape của mô hình
-    img_array = image.img_to_array(img)
-    img_array = np.expand_dims(img_array, axis=0) / 255.0
-
-    # Dự đoán
-    preds = model.predict(img_array)
-    score = np.max(preds)
-    label = class_names[np.argmax(preds)]
-
-    # Hiển thị kết quả
-    st.subheader(f"Kết quả dự đoán: **{label.upper()}** 🍏")
-    st.write(f"Độ tin cậy: `{score:.2f}`")
-
-    # Biểu đồ thanh xác suất
-    st.bar_chart(preds[0])
