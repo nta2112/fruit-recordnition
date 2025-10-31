@@ -52,8 +52,15 @@ def preprocess_image(img: Image.Image, target_size=(100, 100)) -> np.ndarray:
 def predict(model, labels, img_arr, top_k=5):
     preds = model.predict(img_arr)
     preds = np.squeeze(preds)
+    return map_predictions(preds, labels, top_k=top_k)
+
+
+def map_predictions(preds, labels, top_k=5):
+    """Map a prediction vector (1D or 2D squeezed) to (label, prob) tuples safely."""
+    preds = np.squeeze(preds)
     # get top k indices
     top_idx = preds.argsort()[-top_k:][::-1]
+
     # determine number of classes from prediction vector
     try:
         n_classes = preds.shape[-1]
@@ -95,11 +102,31 @@ def main():
         st.warning(err)
         st.info("From your notebook: use `model.save('fruit_cnn_best.h5')` and `json.dump(list(target_labels), open('labels.json','w'))` to create artifacts.")
 
+    # Environment / GPU info (sidebar) — helps explain CUDA/TensorFlow messages
+    with st.sidebar.expander("Environment info", expanded=False):
+        try:
+            import tensorflow as _tf
+            gpus = _tf.config.list_physical_devices('GPU')
+            st.write(f"TensorFlow: {_tf.__version__}")
+            if gpus:
+                st.write(f"GPUs found: {len(gpus)}")
+                for gpu in gpus:
+                    st.write(f" - {gpu}")
+            else:
+                st.write("GPUs found: 0 — TensorFlow will use CPU. If you expected GPU, install CUDA/cuDNN and matching TF build.")
+        except Exception as e:
+            st.write("TensorFlow not available or failed to import:", e)
+
+    debug = st.sidebar.checkbox("Show debug info (pred shapes)", value=False)
+
     uploaded_file = st.file_uploader("Choose an image...", type=["png", "jpg", "jpeg"])
     if uploaded_file is not None:
         image = Image.open(uploaded_file)
-        # use_container_width replaces deprecated use_column_width
-        st.image(image, caption="Uploaded image", use_container_width=True)
+        # Streamlit sizing: prefer width='stretch' (new API). Fall back if not supported.
+        try:
+            st.image(image, caption="Uploaded image", width='stretch')
+        except Exception:
+            st.image(image, caption="Uploaded image", use_container_width=True)
 
         img_arr = preprocess_image(image, target_size=(100, 100))
 
@@ -108,7 +135,25 @@ def main():
         else:
             with st.spinner("Predicting..."):
                 try:
-                    results = predict(model, labels, img_arr, top_k=top_k)
+                    # run model once and optionally show debug info
+                    preds = model.predict(img_arr)
+
+                    if debug:
+                        try:
+                            st.write("preds shape:", np.shape(preds))
+                            st.write("argmax:", int(np.argmax(preds)))
+                            st.write("labels length:", len(labels) if labels is not None else "no labels")
+                            # show probability distribution as bar chart when possible
+                            try:
+                                probs = preds[0] if getattr(preds, 'ndim', 1) > 1 else preds
+                                st.bar_chart(probs)
+                            except Exception:
+                                pass
+                        except Exception:
+                            # ignore debug printing errors
+                            pass
+
+                    results = map_predictions(preds, labels, top_k=top_k)
                 except Exception as e:
                     st.error(f"Prediction failed: {e}")
                     return
@@ -125,5 +170,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
