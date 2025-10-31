@@ -15,7 +15,7 @@ except Exception:
 
 
 @st.cache_resource
-def load_artifacts(model_path="model.h5", labels_path="labels.json"):
+def load_artifacts(model_path="fruit_cnn_best.h5", labels_path="labels.json"):
     """Load Keras model and labels file. Return (model, labels) or (None, None) with error msg."""
     if load_model is None:
         return None, None, "Keras/tensorflow not available in the environment"
@@ -125,3 +125,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
