@@ -86,14 +86,14 @@ def main():
     st.write("Upload an image of a fruit and the model will predict the class.")
 
     st.sidebar.header("Settings")
-    model_path = st.sidebar.text_input("Model path", value="model.h5")
+    model_path = st.sidebar.text_input("Model path", value="fruit_cnn_best.h5")
     labels_path = st.sidebar.text_input("Labels path", value="labels.json")
     top_k = st.sidebar.slider("Top K results", min_value=1, max_value=10, value=5)
 
     model, labels, err = load_artifacts(model_path, labels_path)
     if err:
         st.warning(err)
-        st.info("From your notebook: use `model.save('model.h5')` and `json.dump(list(target_labels), open('labels.json','w'))` to create artifacts.")
+        st.info("From your notebook: use `model.save('fruit_cnn_best.h5')` and `json.dump(list(target_labels), open('labels.json','w'))` to create artifacts.")
 
     uploaded_file = st.file_uploader("Choose an image...", type=["png", "jpg", "jpeg"])
     if uploaded_file is not None:
@@ -125,4 +125,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
