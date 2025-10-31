@@ -43,7 +43,7 @@ if uploaded_file is not None:
 
     # Hiển thị kết quả
     st.subheader(f"Kết quả dự đoán: **{label.upper()}** 🍏")
-    st.write(f"Độ tin cậy: `{score:.2f}`")
 
     # Biểu đồ thanh xác suất
     st.bar_chart(preds[0])
+
